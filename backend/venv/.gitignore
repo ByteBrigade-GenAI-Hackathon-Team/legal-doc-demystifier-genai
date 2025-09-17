@@ -1,9 +1,26 @@
-# Created by venv; see https://docs.python.org/3/library/venv.html
-venv/
-__pycache__/
+# Python #
 *.pyc
+__pycache__/
+venv/
 .env
-node_modules/
+
+# VS Code #
+.vscode/
+
+# Logs #
 *.log
-*.sqlite3
-*.mp4
+
+# Node.js #
+node_modules/
+
+# Build/Static files #
+dist/
+build/
+public/
+
+# OS Files #
+.DS_Store
+Thumbs.db
+
+# IDE-specific #
+.idea/
