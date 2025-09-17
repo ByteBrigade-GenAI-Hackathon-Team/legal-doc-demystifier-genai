@@ -1,8 +1,8 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware # Required for React frontend to talk to backend
+from fastapi.middleware.cors import CORSMiddleware
 
-# Import your simplification logic
-from .api.v1.simplify_document import simplify_legal_document_endpoint
+# ✅ Import the router, not the function
+from .api.v1.simplify_document import router as simplify_router
 
 app = FastAPI(
     title="Legal Document Demystifier Backend",
@@ -11,12 +11,9 @@ app = FastAPI(
 )
 
 # --- CORS Configuration ---
-# This is crucial for your React frontend to be able to make requests to this FastAPI backend.
-# In a real production app, you'd restrict origins more strictly.
 origins = [
-    "http://localhost:3000",  # Default React development server port
-    "http://localhost:8000",  # If your React app is on a different port or served directly by backend
-    # Add your Google Cloud App Engine frontend URL here once deployed
+    "http://localhost:3000",
+    "http://localhost:8000",
 ]
 
 app.add_middleware(
@@ -33,5 +30,5 @@ app.add_middleware(
 async def read_root():
     return {"message": "Welcome to the Legal Document Demystifier Backend!"}
 
-# Include your specific endpoint for document simplification
-app.include_router(simplify_legal_document_endpoint, prefix="/api/v1")
+# ✅ Register the router properly
+app.include_router(simplify_router, prefix="/api/v1")
