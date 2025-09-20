@@ -1,38 +1,89 @@
-.App {
+body {
+  background-color: #f5fbe9;
+  font-family: 'Arial', sans-serif;
+  color: #333;
+  margin: 0;
+  padding: 0;
+}
+
+.app-container {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 1rem;
+}
+
+.title {
   text-align: center;
+  margin-bottom: 2rem;
+  font-size: 1.8rem;
+  font-weight: bold;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+.dark-card {
+  background: #1c1c1c;
   color: white;
 }
 
-.App-link {
-  color: #61dafb;
+.input-box {
+  width: 100%;
+  padding: 0.7rem;
+  margin: 0.5rem 0 1rem;
+  border: none;
+  border-radius: 8px;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.btn {
+  display: inline-block;
+  background: #f5c542;
+  border: none;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  background: #ddd;
+  cursor: not-allowed;
+}
+
+.upload-box {
+  text-align: center;
+}
+
+.file-input {
+  display: block;
+  margin: 1rem auto;
+}
+
+.result-box {
+  background: #fff8e6;
+}
+
+.result-text {
+  white-space: pre-wrap;
+  background: #fdfdfd;
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.disclaimer {
+  display: block;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.query-section {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.5rem;
 }
