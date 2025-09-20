@@ -1,152 +1,125 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
-import os
 from dotenv import load_dotenv
-import textract
+import os
+import io
+from PIL import Image
+import pytesseract
 import google.generativeai as genai
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
-
-# Get your API key from environment variables
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY not found in environment variables.")
 
-# Configure the Generative AI model
+# Configure Gemini
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('models/gemini-2.5-pro')  # Using gemini-pro as discussed
+model = genai.GenerativeModel("models/gemini-2.5-pro")
 
 router = APIRouter()
 
+# Keep context for follow-up queries
+document_context_store = {}
+
 class DocumentRequest(BaseModel):
     document_text: str
-    user_role_goal: str = "general user"  # Default for our USP
+    user_role_goal: str = "general user"
+
+class QueryRequest(BaseModel):
+    query: str
+    doc_id: str
+
+def highlight_risks(text: str) -> str:
+    """
+    Simple heuristic: mark 'risk', 'penalty', 'termination', 'deadline', 'must', 'shall'
+    """
+    risk_words = ["risk", "penalty", "termination", "deadline", "must", "shall", "obligation"]
+    for word in risk_words:
+        text = text.replace(
+            word, f"<span style='color:red;font-weight:bold'>{word}</span>"
+        ).replace(
+            word.capitalize(), f"<span style='color:red;font-weight:bold'>{word.capitalize()}</span>"
+        )
+    return text
 
 @router.post("/simplify")
 async def simplify_document(request: DocumentRequest):
-    """
-    Receives a legal document and simplifies it using Generative AI.
-    Also identifies risks and actionable insights based on user_role_goal.
-    """
-    if not request.document_text:
+    if not request.document_text.strip():
         raise HTTPException(status_code=400, detail="Document text cannot be empty.")
 
-    # --- Prompt Engineering (Improved USP Prompt) ---
-    prompt_template = f"""
-Persona:
-You are a highly accurate, unbiased legal AI assistant specialized in explaining legal documents to laypersons. Your goal is clarity, usefulness, and practical advice tailored to the user's role.
+    doc_id = str(hash(request.document_text + request.user_role_goal))
 
-Task:
-1. Summarize the legal document in simple, non-legal language.
-2. List each key clause, explaining the plain meaning and its relevance.
-3. Identify risks, obligations, or opportunities, focusing on issues relevant to the user's stated role/goal: "{request.user_role_goal}".
-4. Suggest practical, actionable steps or questions without giving legal advice.
-
-Context:
-- The user's role is: "{request.user_role_goal}".
-- The purpose is educational/informative only.
-
-Format:
-Simplified Summary:
-[Concise summary paragraph]
-
-Key Clauses & Meanings:
-- [Bulleted list. For each clause, explain simply and tie it to risks or actions.]
-
-Risks & Actionable Insights:
-- [Bulleted list of specific potential risks and what the user could do next, relevant to their role.]
-
-Overall Recommendations:
-[Short paragraph with useful, non-advisory tips.]
-
-IMPORTANT DISCLAIMER: Output does not constitute legal advice. Consult a qualified professional for legal decisions.
+    prompt = f"""
+You are a legal AI assistant.
+Simplify the following document for the role: {request.user_role_goal}.
+Highlight important risks, obligations, deadlines.
 
 Document:
 {request.document_text}
 """
-    # --- End Prompt Engineering ---
 
     try:
-        # Generate content with a low temperature for factual accuracy
-        response = model.generate_content(
-            prompt_template,
-            generation_config=genai.types.GenerationConfig(temperature=0.1)
-        )
-        simplified_content = response.text
-        return {"simplified_document": simplified_content}
+        response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(temperature=0.2))
+        simplified = highlight_risks(response.text)
+        document_context_store[doc_id] = request.document_text
+        return {"doc_id": doc_id, "simplified_document": simplified}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
 
-
 @router.post("/simplify-file")
-async def simplify_document_file(
-    user_role_goal: str = Form(...),
-    file: UploadFile = File(...)
-):
-    """
-    Receive a document file, extract text, and simplify using Gemini.
-    """
+async def simplify_document_file(user_role_goal: str = Form(...), file: UploadFile = File(...)):
     try:
-        # Read file bytes
-        file_bytes = await file.read()
+        content_type = file.content_type
+        extracted_text = ""
 
-        # Save file temporarily for textract to process
-        with open(file.filename, "wb") as f:
-            f.write(file_bytes)
-
-        # Extract text from the file
-        extracted_text = textract.process(file.filename).decode('utf-8')
-
-        # Remove the temporary file
-        os.remove(file.filename)
+        if content_type.startswith("image/"):
+            image = Image.open(io.BytesIO(await file.read()))
+            extracted_text = pytesseract.image_to_string(image)
+        else:
+            extracted_text = (await file.read()).decode("utf-8", errors="ignore")
 
     except Exception as e:
         return JSONResponse(status_code=400, content={"detail": f"File processing error: {str(e)}"})
 
-    # --- Compose prompt ---
-    prompt_template = f"""
-Persona:
-You are a highly accurate, unbiased legal AI assistant specialized in explaining legal documents to laypersons. Your goal is clarity, usefulness, and practical advice tailored to the user's role.
+    doc_id = str(hash(extracted_text + user_role_goal))
 
-Task:
-1. Summarize the legal document in simple, non-legal language.
-2. List each key clause, explaining the plain meaning and its relevance.
-3. Identify risks, obligations, or opportunities, focusing on issues relevant to the user's stated role/goal: "{user_role_goal}".
-4. Suggest practical, actionable steps or questions without giving legal advice.
-
-Context:
-- The user's role is: "{user_role_goal}".
-- The purpose is educational/informative only.
-
-Format:
-Simplified Summary:
-[Concise summary paragraph]
-
-Key Clauses & Meanings:
-- [Bulleted list. For each clause, explain simply and tie it to risks or actions.]
-
-Risks & Actionable Insights:
-- [Bulleted list of specific potential risks and what the user could do next, relevant to their role.]
-
-Overall Recommendations:
-[Short paragraph with useful, non-advisory tips.]
-
-IMPORTANT DISCLAIMER: Output does not constitute legal advice. Consult a qualified professional for legal decisions.
+    prompt = f"""
+You are a legal AI assistant.
+Simplify the following document for the role: {user_role_goal}.
+Highlight important risks, obligations, deadlines.
 
 Document:
 {extracted_text}
 """
-
     try:
-        # Call Gemini API with the prompt
-        response = model.generate_content(
-            prompt_template,
-            generation_config=genai.types.GenerationConfig(temperature=0.1)
-        )
-        simplified_content = response.text
-        return {"simplified_document": simplified_content}
-
+        response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(temperature=0.2))
+        simplified = highlight_risks(response.text)
+        document_context_store[doc_id] = extracted_text
+        return {"doc_id": doc_id, "simplified_document": simplified}
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": f"AI generation failed: {str(e)}"})
+
+@router.post("/query")
+async def followup_query(request: QueryRequest):
+    doc_text = document_context_store.get(request.doc_id)
+    if not doc_text:
+        return {"answer": "No context found for this document. Please upload again."}
+
+    prompt = f"""
+Answer the following query only using the given document context.
+If the answer is not in the document, respond: "This information is not mentioned in the document."
+
+Document:
+{doc_text}
+
+User query: {request.query}
+"""
+
+    try:
+        response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(temperature=0.2))
+        answer = highlight_risks(response.text)
+        return {"answer": answer}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
