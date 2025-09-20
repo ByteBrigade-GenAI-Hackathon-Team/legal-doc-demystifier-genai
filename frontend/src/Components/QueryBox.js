@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { askFollowUp } from "../api";
 
-function QueryBox({ setAnswer }) {
+function QueryBox({ setAnswer, context }) {
   const [query, setQuery] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!query.trim()) return;
 
-    const data = await askFollowUp(query);
+    const data = await askFollowUp(query, context);
     setAnswer(data.answer);
     setQuery("");
   };

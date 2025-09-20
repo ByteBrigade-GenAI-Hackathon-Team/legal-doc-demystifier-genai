@@ -7,6 +7,8 @@ import io
 from PIL import Image
 import pytesseract
 import google.generativeai as genai
+import pdfplumber
+from docx import Document
 
 # Load environment variables
 load_dotenv()
@@ -73,12 +75,21 @@ async def simplify_document_file(user_role_goal: str = Form(...), file: UploadFi
     try:
         content_type = file.content_type
         extracted_text = ""
+        file_bytes = await file.read()
 
         if content_type.startswith("image/"):
-            image = Image.open(io.BytesIO(await file.read()))
+            image = Image.open(io.BytesIO(file_bytes))
             extracted_text = pytesseract.image_to_string(image)
+        elif content_type == "application/pdf":
+            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                extracted_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+        elif content_type in ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"] or file.filename.endswith(".docx"):
+            doc = Document(io.BytesIO(file_bytes))
+            extracted_text = "\n".join([para.text for para in doc.paragraphs])
+        elif content_type.startswith("text/") or file.filename.endswith(".txt"):
+            extracted_text = file_bytes.decode("utf-8", errors="ignore")
         else:
-            extracted_text = (await file.read()).decode("utf-8", errors="ignore")
+            extracted_text = "Unsupported file type. Please upload an image, PDF, Word (.docx), or text file."
 
     except Exception as e:
         return JSONResponse(status_code=400, content={"detail": f"File processing error: {str(e)}"})
