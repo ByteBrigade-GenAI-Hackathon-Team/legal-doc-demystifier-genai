@@ -1,23 +1,33 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.simplify_document import router as simplify_router
-from app.api.v1.followup import router as followup_router
 
-app = FastAPI(title="Legal Document Demystifier Backend")
+app = FastAPI(
+    title="Legal Document Demystifier Backend",
+    description="API for simplifying legal documents using Generative AI.",
+    version="1.0.0",
+)
 
-origins = ["*"]
+# --- CORS Configuration ---
+origins = [
+    "http://localhost:3000",
+    "http://localhost:8000",
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# --- END CORS Configuration ---
+
 
 @app.get("/")
-async def root():
-    return {"message": "Welcome to Legal Document Demystifier"}
+async def read_root():
+    return {"message": "Welcome to the Legal Document Demystifier Backend!"}
 
+
+# ✅ Register router
 app.include_router(simplify_router, prefix="/api/v1")
-app.include_router(followup_router)
