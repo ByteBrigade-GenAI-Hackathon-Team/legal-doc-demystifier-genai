@@ -40,7 +40,7 @@ function App() {
     }
     data = await res.json();
     setResult(data.simplified_document || data.detail || "No result");
-    setDocId(data.doc_id || "");
+    setDocId(data.doc_id);
     setLoading(false);
   };
 
